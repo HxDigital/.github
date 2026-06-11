@@ -1,0 +1,39 @@
+name: CI Next.js
+
+# Workflow reutilizável para projetos Next.js da org.
+# Os projetos chamam com:
+#   jobs:
+#     ci:
+#       uses: HxDigital/.github/.github/workflows/ci-nextjs.yml@main
+#       secrets: inherit
+# Como é workflow_call, não roda no próprio repo .github (que não tem código Next.js).
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
