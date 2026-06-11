@@ -1,0 +1,19 @@
+name: Feature
+description: Sugerir uma nova funcionalidade ou melhoria
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descrição
+      description: O que você quer que seja feito?
+    validations:
+      required: true
+  - type: textarea
+    id: motivo
+    attributes:
+      label: Por que é necessário
+      description: Qual problema resolve ou que valor entrega?
+    validations:
+      required: true
