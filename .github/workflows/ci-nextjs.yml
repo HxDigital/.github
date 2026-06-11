@@ -11,12 +11,34 @@ name: CI Next.js
 # CI (PR/preview): lint, type check e build (`next build`). NÃO roda migration.
 # `payload migrate` é passo de deploy de produção (pg_dump -> migrate -> build -> publish),
 # nunca em PR/preview. Ver ADR-002, STANDARDS e WORKFLOW.
+#
+# Isolamento (SEC-7, ver HxDigital/docs/ISOLAMENTO.md): o build NÃO recebe credencial de
+# produção. Usa um Postgres efêmero (service container deste job) e um PAYLOAD_SECRET dummy.
 on:
   workflow_call:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # Banco efêmero só para o build conseguir introspecção/geração do Payload.
+    # Sobe e morre com o job; nunca é o banco de produção.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_DB: ci
+          # Sem senha: auth trust no banco efêmero (nada de credencial, nem dummy).
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,10 +47,15 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
+      # Node a partir do `.nvmrc` do projeto (fonte única da versão). Se o projeto
+      # ainda não tiver `.nvmrc`, assume o padrão da casa (Node 24 LTS).
+      - name: Garante .nvmrc (Node 24 como padrão da casa)
+        run: '[ -f .nvmrc ] || echo 24 > .nvmrc'
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -41,8 +68,9 @@ jobs:
         run: pnpm exec tsc --noEmit
 
       # Só `next build`; a migration do Payload NÃO roda no CI (ver comentário no topo).
+      # DB efêmero + secret dummy: nunca o de produção.
       - name: Build
         run: pnpm build
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+          DATABASE_URL: postgres://ci@localhost:5432/ci
+          PAYLOAD_SECRET: ci-build-dummy-not-for-production
