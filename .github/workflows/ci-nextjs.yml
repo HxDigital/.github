@@ -7,6 +7,10 @@ name: CI Next.js
 #       uses: HxDigital/.github/.github/workflows/ci-nextjs.yml@main
 #       secrets: inherit
 # Como é workflow_call, não roda no próprio repo .github (que não tem código Next.js).
+#
+# CI (PR/preview): lint, type check e build (`next build`). NÃO roda migration.
+# `payload migrate` é passo de deploy de produção (pg_dump -> migrate -> build -> publish),
+# nunca em PR/preview. Ver ADR-002, STANDARDS e WORKFLOW.
 on:
   workflow_call:
 
@@ -17,23 +21,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Lê a versão do pnpm do campo `packageManager` do package.json do projeto.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm lint
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
 
+      # Só `next build`; a migration do Payload NÃO roda no CI (ver comentário no topo).
       - name: Build
-        run: npm run build
+        run: pnpm build
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
